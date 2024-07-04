@@ -7,6 +7,8 @@ pub trait IFRTCoin<TContractState> {
     fn set_sneaker_contract_address(
         ref self: TContractState, sneaker_contract_address: ContractAddress
     );
+    fn claim_tokens(ref self: TContractState, steps: u64);
+    fn whitelist_user(ref self: TContractState, user_address: ContractAddress);
 }
 
 
@@ -31,6 +33,7 @@ mod FRTCoin {
         decimals: u8,
         owner: ContractAddress,
         sneaker_contract: ContractAddress,
+        whitelisted_addresses: LegacyMap::<ContractAddress, bool>
     }
 
     #[event]
@@ -42,7 +45,8 @@ mod FRTCoin {
 
     mod Errors {
         pub const ONLY_OWNER: felt252 = 'Only owner can do operation';
-        pub const ONLY_BLOBERT_OWNER: felt252 = 'Only Blobert owner can do op';
+        pub const ONLY_SNEAKER_OWNER: felt252 = 'Only Sneaker owner can do op';
+        pub const ONLY_WHITELISTED_ADDRESSES: felt252 = 'Only Whitelisted addr can claim';
     }
 
     #[constructor]
@@ -62,6 +66,7 @@ mod FRTCoin {
     #[abi(embed_v0)]
     impl IFRTCoinImpl of super::IFRTCoin<ContractState> {
         fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
+            assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
             assert(amount < 10000, 'mint amount exceeds limit');
             assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
             self.erc20._mint(recipient, amount);
@@ -75,6 +80,17 @@ mod FRTCoin {
         }
         fn get_sneaker_contract_address(self: @ContractState) -> ContractAddress {
             self.sneaker_contract.read()
+        }
+
+        fn claim_tokens(ref self: ContractState, steps: u64) {
+            let is_whitelisted = self.whitelisted_addresses.read(get_caller_address());
+            assert(is_whitelisted, Errors::ONLY_WHITELISTED_ADDRESSES);
+            self.erc20._mint(get_caller_address(), steps.into());
+        }
+        
+        fn whitelist_user(ref self: ContractState, user_address: ContractAddress) {
+            assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
+            self.whitelisted_addresses.write(user_address, true);
         }
     }
 

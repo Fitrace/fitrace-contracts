@@ -1,2 +1,2 @@
-mod SneakerNFT;
+// mod SneakerNFT;
 mod FRTCoin;
