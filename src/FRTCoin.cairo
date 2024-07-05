@@ -9,6 +9,7 @@ pub trait IFRTCoin<TContractState> {
     );
     fn claim_tokens(ref self: TContractState, steps: u64);
     fn whitelist_user(ref self: TContractState, user_address: ContractAddress);
+    fn add_owner(ref self: TContractState, new_owner: ContractAddress);
 }
 
 
@@ -17,6 +18,7 @@ mod FRTCoin {
     use openzeppelin::token::erc20::ERC20Component;
     use starknet::{ContractAddress, get_caller_address};
     use openzeppelin::token::erc20::interface;
+    use openzeppelin::token::erc721::interface::{IERC721Dispatcher, IERC721DispatcherTrait};
 
     component!(path: ERC20Component, storage: erc20, event: ERC20Event);
 
@@ -31,7 +33,7 @@ mod FRTCoin {
         #[substorage(v0)]
         erc20: ERC20Component::Storage,
         decimals: u8,
-        owner: ContractAddress,
+        owners: LegacyMap::<ContractAddress, bool>,
         sneaker_contract: ContractAddress,
         whitelisted_addresses: LegacyMap::<ContractAddress, bool>
     }
@@ -60,22 +62,21 @@ mod FRTCoin {
         let symbol = "FRT";
         self.erc20.initializer(name, symbol);
         self.erc20._mint(owner, 1000_000_00);
-        self.owner.write(owner);
+        self.owners.write(owner, true);
         self.sneaker_contract.write(sneaker_contract);
     }
     #[abi(embed_v0)]
     impl IFRTCoinImpl of super::IFRTCoin<ContractState> {
         fn mint(ref self: ContractState, recipient: ContractAddress, amount: u256) {
-            assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
+            assert(self.owners.read(get_caller_address()) == true, Errors::ONLY_OWNER);
             assert(amount < 10000, 'mint amount exceeds limit');
-            assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
             self.erc20._mint(recipient, amount);
         }
 
         fn set_sneaker_contract_address(
             ref self: ContractState, sneaker_contract_address: ContractAddress
         ) {
-            assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
+            assert(self.owners.read(get_caller_address()) == true, Errors::ONLY_OWNER);
             self.sneaker_contract.write(sneaker_contract_address);
         }
         fn get_sneaker_contract_address(self: @ContractState) -> ContractAddress {
@@ -83,14 +84,25 @@ mod FRTCoin {
         }
 
         fn claim_tokens(ref self: ContractState, steps: u64) {
+            let recipient = get_caller_address();
+            let sneaker_nft = IERC721Dispatcher { contract_address: self.sneaker_contract.read() };
+            let is_holds_nft = sneaker_nft.balance_of(recipient) > 0;
+            let mut token_to_claim = steps;
+            if is_holds_nft {
+                token_to_claim = steps * 2;
+            }
             let is_whitelisted = self.whitelisted_addresses.read(get_caller_address());
             assert(is_whitelisted, Errors::ONLY_WHITELISTED_ADDRESSES);
-            self.erc20._mint(get_caller_address(), steps.into());
+            self.erc20._mint(recipient, token_to_claim.into());
         }
-        
+
         fn whitelist_user(ref self: ContractState, user_address: ContractAddress) {
-            assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
+            assert(self.owners.read(get_caller_address()) == true, Errors::ONLY_OWNER);
             self.whitelisted_addresses.write(user_address, true);
+        }
+        fn add_owner(ref self: ContractState, new_owner: ContractAddress) {
+            assert(self.owners.read(get_caller_address()) == true, Errors::ONLY_OWNER);
+            self.owners.write(new_owner, true);
         }
     }
 

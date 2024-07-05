@@ -7,6 +7,7 @@ pub trait ISneakerNFT<TContractState> {
     ) -> u256;
     fn set_base_uri(ref self: TContractState, base_uri: ByteArray);
     fn get_sneaker_type_and_level(self: @TContractState, token_id: u256) -> (u8, u8);
+    fn add_owner(ref self: TContractState, new_owner: ContractAddress);
 }
 
 
@@ -44,7 +45,7 @@ mod SneakerNFT {
         #[substorage(v0)]
         src5: SRC5Component::Storage,
         total_count: u32,
-        owner: ContractAddress,
+        owners: LegacyMap::<ContractAddress, bool>,
         sneaker_type: LegacyMap::<u256, u8>,
         sneaker_level: LegacyMap::<u256, u8>
     }
@@ -60,21 +61,17 @@ mod SneakerNFT {
 
     mod Errors {
         pub const ONLY_OWNER: felt252 = 'Only owner can do operation';
-        pub const ONLY_BLOBERT_OWNER: felt252 = 'Only Blobert owner can do op';
-        pub const ZERO_DODGECOIN: felt252 = 'Dodgecoin is zero address';
     }
 
     #[constructor]
-    fn constructor(
-        ref self: ContractState, owner: ContractAddress, blobert_address: ContractAddress
-    ) {
+    fn constructor(ref self: ContractState, owner: ContractAddress) {
         let name = "Fitrace Sneaker";
         let symbol = "FRTSNEAKER";
         let base_uri = "https://fitrace.xyz/api?id=";
         let token_id = 1;
 
         self.erc721.initializer(name, symbol, base_uri);
-        self.owner.write(owner);
+        self.owners.write(owner, true);
         self.erc721._mint(owner, token_id);
         self.total_count.write(1);
     }
@@ -85,7 +82,7 @@ mod SneakerNFT {
         fn mint(
             ref self: ContractState, recipient: ContractAddress, sneaker_type: u8, sneaker_level: u8
         ) -> u256 {
-            assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
+            assert(self.owners.read(get_caller_address()) == true, Errors::ONLY_OWNER);
             let token_id = self.total_count.read() + 1;
             self.total_count.write(token_id);
             self.erc721._mint(recipient, token_id.into());
@@ -95,12 +92,16 @@ mod SneakerNFT {
         }
 
         fn set_base_uri(ref self: ContractState, base_uri: ByteArray) {
-            assert(get_caller_address() == self.owner.read(), Errors::ONLY_OWNER);
+            assert(self.owners.read(get_caller_address()) == true, Errors::ONLY_OWNER);
             self.erc721._set_base_uri(base_uri);
         }
 
         fn get_sneaker_type_and_level(self: @ContractState, token_id: u256) -> (u8, u8) {
             (self.sneaker_type.read(token_id), self.sneaker_level.read(token_id))
+        }
+        fn add_owner(ref self: ContractState, new_owner: ContractAddress) {
+            assert(self.owners.read(get_caller_address()) == true, Errors::ONLY_OWNER);
+            self.owners.write(new_owner, true);
         }
     }
 }
