@@ -220,3 +220,13 @@ sncast --profile testnet1 deploy --class-hash <class-hash> --constructor-calldat
 # Other Useful commands
 
 1. Run `scarb --offline build` to build a project without updating dependencies.
+
+
+
+# Deployed Addresses on Sepolia
+
+SneakerNFT address: 0x226ba1d0a2c35eab7f516ed57f5bd4fccc7d5c2756cc7fe6fe97168765ab293
+
+
+FRT Coin Address:
+0x63e016a820dc3b215236a01fc21981e33f15091660cb92d14de908973175bd3
