@@ -81,7 +81,7 @@ mod SneakerNFT {
 
 
     #[abi(embed_v0)]
-    impl IDodgeBallNFTImpl of super::ISneakerNFT<ContractState> {
+    impl ISneakerNFTImpl of super::ISneakerNFT<ContractState> {
         fn mint(
             ref self: ContractState, recipient: ContractAddress, sneaker_type: u8, sneaker_level: u8
         ) -> u256 {
